@@ -30,6 +30,25 @@ ce = eospy.cleos.Cleos(args.url, version=args.api_version)
 global rslts
 rslts = []
 
+def getKeys(acct_info):
+    permissions = acct_info['permissions']
+    active_key = 'None'
+    owner_key = 'None'
+    for p in permissions:
+        if p['perm_name'] == 'active':
+            keys = p['required_auth']['keys']
+            if len(keys) == 1:
+                active_key = keys[0]['key']
+            else:
+                active_key = 'count {0}'.format(len(keys))
+        if p['perm_name'] == 'owner':
+            keys = p['required_auth']['keys']
+            if len(keys) == 1:
+                owner_key = keys[0]['key']
+            else:
+                owner_key = 'count {0}'.format(len(keys))
+    return(owner_key, active_key)
+
 def check_account(name, get_staked=False) :
     acct_info = ce.get_account(name)
     created_time = dt.datetime.strptime(acct_info['created'], '%Y-%m-%dT%H:%M:%S.%f')
@@ -55,15 +74,16 @@ def check_account(name, get_staked=False) :
             refund_net = 0.0
         staked_total = cpu + net
         refund_total = refund_cpu + refund_net
+        keys = getKeys(acct_info)
         if get_staked :
-            rslts.append('{0},{1},{2:.4f},{2:.4f}'.format(created_time, name, liquid + staked_total + refund_total, staked_total))
+            rslts.append('{0},{1},{4},{5},{2:.4f},{3:.4f}'.format(created_time, name, liquid + staked_total + refund_total, staked_total, keys[0], keys[1]))
         else :
-            rslts.append('{0},{1},{2:.4f}'.format(created_time, name, liquid + staked_total + refund_total))
+            rslts.append('{0},{1},{3},{4},{2:.4f}'.format(created_time, name, liquid + staked_total + refund_total, keys[0], keys[1]))
 
 with open(args.acct_file) as ro:
     accounts = list(ro.readlines())
     
-num_thds = 128
+num_thds = 10
 total = len(accounts)
 print('Got {} accounts'.format(total))
 cnt = 0
@@ -88,8 +108,8 @@ while cnt < total :
 print('Rslts cnt: {0}'.format(len(rslts)))
 with open(args.out_file,'w') as wb:
     if args.staked :
-        wb.write('creation_time,account_name,total_eos,total_staked\n')
+        wb.write('creation_time,account_name,owner_key,active_key,total_eos,total_staked\n')
     else :
-        wb.write('creation_time,account_name,total_eos\n')
+        wb.write('creation_time,account_name,owner_key,active_key,total_eos\n')
     for line in rslts:
         wb.write('{}\n'.format(line))
